@@ -250,6 +250,31 @@ impl pallet_balances::Config for Runtime {
 }
 
 parameter_types! {
+	// Fees required to keep track of account names on-chain
+	pub const NickReservationFee: u128 = 100;
+	// min and max length of nicks
+	pub const MinNickLength: u32 = 8;
+	pub const MaxNickLength: u32 = 32;
+}
+
+impl pallet_nicks::Config for Runtime {
+	type Currency = Balances;
+
+	// Params from const above
+	type ReservationFee = NickReservationFee;
+	type MinLength = MinNickLength;
+	type MaxLength = MaxNickLength;
+
+	// Based on docs, No action is taken when deposits are forefeited.
+	type Slashed =  ();
+
+	// Configure the FRAME System Root origin as the Nick pallet admin.
+    // https://docs.substrate.io/rustdocs/latest/frame_system/enum.RawOrigin.html#variant.Root
+	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
+	type Event = Event;
+}
+
+parameter_types! {
 	pub const TransactionByteFee: Balance = 1;
 }
 
@@ -288,6 +313,8 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
+		// Including nicks pallet
+		Nicks: pallet_nicks::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
