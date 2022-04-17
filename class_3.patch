@@ -1,0 +1,66 @@
+diff --git a/pallets/template/src/lib.rs b/pallets/template/src/lib.rs
+index f5ce8c5..ba04f41 100644
+--- a/pallets/template/src/lib.rs
++++ b/pallets/template/src/lib.rs
+@@ -16,7 +16,7 @@ mod benchmarking;
+ 
+ #[frame_support::pallet]
+ pub mod pallet {
+-	use frame_support::pallet_prelude::*;
++	use frame_support::{pallet_prelude::*, traits::Currency, sp_runtime::SaturatedConversion};
+ 	use frame_system::pallet_prelude::*;
+ 
+ 	/// Configure the pallet by specifying the parameters and types on which it depends.
+@@ -24,6 +24,7 @@ pub mod pallet {
+ 	pub trait Config: frame_system::Config {
+ 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
+ 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
++		type LocalCurrency: Currency<Self::AccountId>;
+ 	}
+ 
+ 	#[pallet::pallet]
+@@ -46,6 +47,7 @@ pub mod pallet {
+ 		/// Event documentation should end with an array that provides descriptive names for event
+ 		/// parameters. [something, who]
+ 		SomethingStored(u32, T::AccountId),
++		TotalIssuance(u32),
+ 	}
+ 
+ 	// Errors inform users that something went wrong.
+@@ -71,11 +73,15 @@ pub mod pallet {
+ 			// https://docs.substrate.io/v3/runtime/origins
+ 			let who = ensure_signed(origin)?;
+ 
++			let total_balance: <<T as Config>::LocalCurrency as Currency<<T as frame_system::Config>::AccountId>>::Balance = T::LocalCurrency::total_issuance();
++			let value: u32 = total_balance.saturated_into::<u32>();
++
+ 			// Update storage.
+ 			<Something<T>>::put(something);
+ 
+ 			// Emit an event.
+ 			Self::deposit_event(Event::SomethingStored(something, who));
++			Self::deposit_event(Event::TotalIssuance(value));
+ 			// Return a successful DispatchResultWithPostInfo
+ 			Ok(())
+ 		}
+diff --git a/runtime/src/lib.rs b/runtime/src/lib.rs
+index 6b9cc6a..2cc2fd2 100644
+--- a/runtime/src/lib.rs
++++ b/runtime/src/lib.rs
+@@ -294,6 +294,7 @@ impl pallet_sudo::Config for Runtime {
+ /// Configure the pallet-template in pallets/template.
+ impl pallet_template::Config for Runtime {
+ 	type Event = Event;
++	type LocalCurrency = Balances;
+ }
+ 
+ // Create the runtime by composing the FRAME pallets that were previously configured.
+@@ -308,7 +309,7 @@ construct_runtime!(
+ 		Timestamp: pallet_timestamp,
+ 		Aura: pallet_aura,
+ 		Grandpa: pallet_grandpa,
+-		Balances: pallet_balances,
++		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+ 		TransactionPayment: pallet_transaction_payment,
+ 		Sudo: pallet_sudo,
+ 		// Include the custom logic from the pallet-template in the runtime.
